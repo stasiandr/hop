@@ -21,11 +21,19 @@ final class GlobalHotKey {
         Self.handlerInstalled = true
     }
 
-    /// Replaces any previously registered hotkey. Returns false if the system refused it.
+    /// Replaces any previously registered hotkey. Returns false if the system
+    /// refused it; the previous hotkey then stays active.
     @discardableResult
     func register(_ hotkey: Hotkey) -> Bool {
         if hotkey == current, ref != nil { return true }
+        let previous = current
         unregister()
+        if registerRaw(hotkey) { return true }
+        if let previous { _ = registerRaw(previous) }
+        return false
+    }
+
+    private func registerRaw(_ hotkey: Hotkey) -> Bool {
         let id = EventHotKeyID(signature: OSType(0x686F_7021), id: 1) // 'hop!'
         let status = RegisterEventHotKey(hotkey.keyCode, hotkey.modifiers, id, GetApplicationEventTarget(), 0, &ref)
         guard status == noErr else { ref = nil; return false }
