@@ -34,6 +34,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.apply(config: config, items: resolveItems(config) + builtins())
         panel.error = store.error
 
+        if let problem = LoginAgentFile.sync(enabled: config.launchAtLogin) {
+            panel.error = problem
+        }
+
         do {
             let key = try Hotkey.parse(config.hotkey)
             if !hotKey.register(key) {

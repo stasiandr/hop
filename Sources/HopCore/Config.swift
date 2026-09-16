@@ -21,6 +21,7 @@ public struct Config: Equatable, Sendable {
     public var hotkey: String = "alt+space"
     public var width: Double = 640
     public var maxResults: Int = 8
+    public var launchAtLogin = false
     public var apps: [AppEntry] = []
 
     public init() {}
@@ -41,6 +42,10 @@ public struct Config: Equatable, Sendable {
         if let v = root["max_results"] {
             guard let i = v.int, i >= 1 else { throw ConfigError("max_results must be an integer >= 1") }
             config.maxResults = i
+        }
+        if let v = root["launch_at_login"] {
+            guard let b = v.bool else { throw ConfigError("launch_at_login must be true or false") }
+            config.launchAtLogin = b
         }
 
         if let v = root["app"] {
@@ -93,6 +98,9 @@ public struct Config: Equatable, Sendable {
     # Panel width in points and how many results to show.
     width = 640
     max_results = 8
+
+    # Start hop when you log in (a LaunchAgent in ~/Library/LaunchAgents).
+    launch_at_login = false
 
     # Each [[app]] is something hop can launch.
     #   path   — path to the .app bundle (~ allowed), or

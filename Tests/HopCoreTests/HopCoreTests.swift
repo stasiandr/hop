@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import HopCore
 
@@ -110,5 +111,28 @@ import Testing
         let items = [("Visual Studio Code", ["code"]), ("Xcode", [])]
         let ranked = Matcher.rank(items, query: "code", terms: { [$0.0] + $0.1 })
         #expect(ranked.first?.0 == "Visual Studio Code")
+    }
+}
+
+@Suite struct LoginAgentTests {
+    @Test func stablePath() {
+        #expect(LoginAgent.stablePath("/opt/homebrew/Cellar/hop/0.1.0/hop.app/Contents/MacOS/hop")
+                == "/opt/homebrew/opt/hop/hop.app/Contents/MacOS/hop")
+        #expect(LoginAgent.stablePath("/Users/me/hop/build/hop.app/Contents/MacOS/hop")
+                == "/Users/me/hop/build/hop.app/Contents/MacOS/hop")
+    }
+
+    @Test func plistIsValid() throws {
+        let text = LoginAgent.plist(executable: "/Apps/A&B/hop")
+        let data = try #require(text.data(using: .utf8))
+        let dict = try #require(try PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any])
+        #expect(dict["Label"] as? String == "dev.hop.launcher")
+        #expect(dict["ProgramArguments"] as? [String] == ["/Apps/A&B/hop"])
+        #expect(dict["RunAtLoad"] as? Bool == true)
+    }
+
+    @Test func configFlag() throws {
+        #expect(try Config.parse("launch_at_login = true").launchAtLogin)
+        #expect(throws: ConfigError.self) { try Config.parse("launch_at_login = 1") }
     }
 }

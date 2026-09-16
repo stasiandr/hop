@@ -7,15 +7,23 @@ letters, hit Return.
 - No Dock icon, no menu bar icon, no Accessibility permission needed
 - Everything lives in one TOML file
 
-## Build & run
+## Install
 
 ```sh
-scripts/bundle.sh          # → build/hop.app
-open build/hop.app
+brew install stasiandr/tap/hop     # builds from source
+open "$(brew --prefix)/opt/hop/hop.app"
 ```
 
-Press `⌥ Space` to open the panel. To start hop at login, add `build/hop.app`
-(or a copy in `/Applications`) under System Settings → General → Login Items.
+Or from a checkout: `scripts/bundle.sh && open build/hop.app`.
+
+Press `⌥ Space` to open the panel. Set `launch_at_login = true` in the config to
+start hop with your session.
+
+### Taking over ⌘ Space from Spotlight
+
+Disable "Show Spotlight search" under System Settings → Keyboard → Keyboard
+Shortcuts → Spotlight (or with [mac-and-conf](#with-mac-and-conf)), then set
+`hotkey = "cmd+space"`.
 
 ## Keys
 
@@ -39,6 +47,7 @@ panel.
 hotkey = "alt+space"   # modifiers: cmd, alt/opt, ctrl, shift
 width = 640
 max_results = 8
+launch_at_login = true # writes ~/Library/LaunchAgents/dev.hop.launcher.plist
 
 [[app]]
 path = "/Applications/Safari.app"
@@ -52,6 +61,22 @@ alias = "vs"
 
 Each `[[app]]` needs exactly one of `path` or `bundle`. `name` defaults to the
 bundle's file name; `alias` is a string or a list of strings.
+
+The config file may be a symlink (e.g. into a dotfiles repo); edits to the
+target are picked up too.
+
+### With mac-and-conf
+
+```toml
+[brew]
+formulae = ["stasiandr/tap/hop"]
+
+[dotfiles]
+"~/.config/hop/config.toml" = "dotfiles/hop/config.toml"
+
+[symbolic_hotkeys]
+spotlight = false   # free ⌘ Space for hop
+```
 
 ## Development
 
