@@ -1,14 +1,10 @@
 #!/bin/sh
 # Builds a release binary and wraps it into build/hop.app.
-# Extra `swift build` flags can be passed in SWIFT_BUILD_FLAGS (Homebrew needs
-# --disable-sandbox, since its own build sandbox can't be nested).
 set -eu
 cd "$(dirname "$0")/.."
 
-# shellcheck disable=SC2086
-swift build -c release ${SWIFT_BUILD_FLAGS:-}
-# shellcheck disable=SC2086
-BIN="$(swift build -c release ${SWIFT_BUILD_FLAGS:-} --show-bin-path)/hop"
+swift build -c release
+BIN="$(swift build -c release --show-bin-path)/hop"
 
 APP=build/hop.app
 rm -rf "$APP"

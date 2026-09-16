@@ -17,7 +17,7 @@ enum LoginAgentFile {
                 guard let exe = Bundle.main.executableURL?.resolvingSymlinksInPath().path else {
                     return "launch_at_login: can't find hop's executable"
                 }
-                let text = LoginAgent.plist(executable: LoginAgent.stablePath(exe))
+                let text = LoginAgent.plist(executable: exe)
                 if (try? String(contentsOf: url, encoding: .utf8)) == text { return nil }
                 try fm.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
                 try text.write(to: url, atomically: true, encoding: .utf8)

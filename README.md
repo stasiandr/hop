@@ -7,14 +7,12 @@ letters, hit Return.
 - No Dock icon, no menu bar icon, no Accessibility permission needed
 - Everything lives in one TOML file
 
-## Install
+## Build & run
 
 ```sh
-brew install stasiandr/tap/hop     # builds from source
-open "$(brew --prefix)/opt/hop/hop.app"
+scripts/bundle.sh          # → build/hop.app
+open build/hop.app
 ```
-
-Or from a checkout: `scripts/bundle.sh && open build/hop.app`.
 
 Press `⌥ Space` to open the panel. Set `launch_at_login = true` in the config to
 start hop with your session.
@@ -68,8 +66,11 @@ target are picked up too.
 ### With mac-and-conf
 
 ```toml
-[brew]
-formulae = ["stasiandr/tap/hop"]
+[tools.hop]
+repo = "git@github.com:stasiandr/hop.git"
+path = "~/personal/hop"
+build = "scripts/bundle.sh"   # rebuilt by `apply` whenever the checkout changes
+links = { "~/Applications/hop.app" = "build/hop.app" }
 
 [dotfiles]
 "~/.config/hop/config.toml" = "dotfiles/hop/config.toml"

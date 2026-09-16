@@ -1,18 +1,9 @@
 import Foundation
 
-/// Start-at-login via a user LaunchAgent. A LaunchAgent (rather than
-/// SMAppService) lets hop point at a path that survives `brew upgrade`.
+/// Start-at-login via a user LaunchAgent that runs hop's executable in place,
+/// so a rebuilt `build/hop.app` is picked up without re-registering.
 public enum LoginAgent {
     public static let label = "dev.hop.launcher"
-
-    /// Homebrew installs into `…/Cellar/hop/<version>/`, which disappears on
-    /// upgrade; `…/opt/hop/` always points at the current version.
-    public static func stablePath(_ path: String) -> String {
-        guard let cellar = path.range(of: "/Cellar/hop/") else { return path }
-        let rest = path[cellar.upperBound...]
-        guard let slash = rest.firstIndex(of: "/") else { return path }
-        return path[..<cellar.lowerBound] + "/opt/hop" + rest[slash...]
-    }
 
     public static func plist(executable: String) -> String {
         let escaped = executable

@@ -115,13 +115,6 @@ import Testing
 }
 
 @Suite struct LoginAgentTests {
-    @Test func stablePath() {
-        #expect(LoginAgent.stablePath("/opt/homebrew/Cellar/hop/0.1.0/hop.app/Contents/MacOS/hop")
-                == "/opt/homebrew/opt/hop/hop.app/Contents/MacOS/hop")
-        #expect(LoginAgent.stablePath("/Users/me/hop/build/hop.app/Contents/MacOS/hop")
-                == "/Users/me/hop/build/hop.app/Contents/MacOS/hop")
-    }
-
     @Test func plistIsValid() throws {
         let text = LoginAgent.plist(executable: "/Apps/A&B/hop")
         let data = try #require(text.data(using: .utf8))
