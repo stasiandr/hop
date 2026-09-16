@@ -23,6 +23,7 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
     private let table = NSTableView()
     private let scroll = NSScrollView()
     private let errorLabel = NSTextField(labelWithString: "")
+    private let latinInput = LatinInput()
 
     private var allItems: [Item] = []
     private var results: [Item] = []
@@ -109,22 +110,24 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         positionOnActiveScreen()
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
-        // Queries are app names: only Latin layouts, so a Russian (or any
-        // non-Roman) layout left active elsewhere doesn't produce "ыфа".
-        // The previous layout comes back once the panel loses focus.
-        (fieldEditor(true, for: field) as? NSTextView)?.inputContext?.allowedInputSourceLocales =
-            [NSAllRomanInputSourcesLocaleIdentifier]
         makeFirstResponder(field)
+        latinInput.begin()
     }
 
     func dismiss() {
-        orderOut(nil)
+        closePanel()
         NSApp.hide(nil) // hand focus back to the previous app
     }
 
     override func resignKey() {
         super.resignKey()
-        if isVisible { orderOut(nil) }
+        if isVisible { closePanel() }
+    }
+
+    /// Every way out of the panel goes through here, so the layout is always restored.
+    private func closePanel() {
+        latinInput.end()
+        orderOut(nil)
     }
 
     // MARK: - Search
@@ -173,8 +176,8 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         let item = results[row]
         // Run while hop is still active: macOS only lets the active app hand
         // over focus, so hiding first would leave running apps in the background.
+        closePanel() // restore the layout before the target app takes focus
         (alt ? item.altRun ?? item.run : item.run)()
-        orderOut(nil)
     }
 
     @objc private func clickedRow() {
