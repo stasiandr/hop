@@ -72,8 +72,13 @@ open = "dev.zed.Zed"                 # Return
 alt_open = "com.mitchellh.ghostty"   # ⌘Return
 ```
 
-The inventory is JSON with `apps` (`name`, `path` to a .app) and `tools`
-(`name`, `path` to a folder, shown as projects). hop reloads it when it
+The inventory is JSON with `apps` (`name`, `path` to a .app), `tools`
+(`name`, `path` to a folder, shown as projects) and `unity` (`name`, `path`,
+`version` of Unity projects). Return on a Unity project brings its editor to
+the front if the project is already open, otherwise runs `unity open`; if that
+fails (say, the editor version isn't installed) the project goes to
+[uhub](https://github.com/stasiandr/uhub), which offers to install it. ⌘Return
+uses `project.alt_open` like any other project. hop reloads it when it
 changes. An `[[app]]` for the same bundle wins, so it can add aliases. Without
 `[project]` settings projects open in Finder; with only one of them set, both
 keys use it.

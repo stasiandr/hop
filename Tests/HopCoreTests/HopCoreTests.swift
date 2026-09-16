@@ -142,6 +142,18 @@ import Testing
         #expect(inventory.tools == [Inventory.Tool(name: "hop", path: "/Users/me/personal/hop")])
     }
 
+    @Test func parsesUnityProjects() throws {
+        let json = """
+        {"apps": [], "tools": [],
+         "unity": [{"name": "dacha", "path": "/Users/me/work/dacha", "repo": "git@github.com:me/dacha.git", "version": "6000.3.24f1"},
+                   {"name": "old", "path": "/Users/me/work/old", "repo": "r", "version": null}]}
+        """
+        let inventory = try Inventory.parse(Data(json.utf8)).excluding(["old"])
+        #expect(inventory.unity == [Inventory.UnityProject(name: "dacha", path: "/Users/me/work/dacha", version: "6000.3.24f1")])
+        // Inventories written before Unity support have no `unity` key.
+        #expect(try Inventory.parse(Data(#"{"apps": [], "tools": []}"#.utf8)).unity.isEmpty)
+    }
+
     @Test func configKeys() throws {
         let config = try Config.parse("""
         inventory = "~/.local/state/mac-and-conf/inventory.json"

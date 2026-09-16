@@ -14,12 +14,35 @@ public struct Inventory: Codable, Equatable, Sendable {
         public var path: String
     }
 
+    /// Unity projects: opened in the Unity editor they were made with.
+    public struct UnityProject: Codable, Equatable, Sendable {
+        public var name: String
+        public var path: String
+        /// From `ProjectSettings/ProjectVersion.txt`, e.g. `6000.3.24f1`.
+        public var version: String?
+
+        public init(name: String, path: String, version: String? = nil) {
+            self.name = name
+            self.path = path
+            self.version = version
+        }
+    }
+
     public var apps: [App] = []
     public var tools: [Tool] = []
+    public var unity: [UnityProject] = []
 
-    public init(apps: [App] = [], tools: [Tool] = []) {
+    public init(apps: [App] = [], tools: [Tool] = [], unity: [UnityProject] = []) {
         self.apps = apps
         self.tools = tools
+        self.unity = unity
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        apps = try c.decodeIfPresent([App].self, forKey: .apps) ?? []
+        tools = try c.decodeIfPresent([Tool].self, forKey: .tools) ?? []
+        unity = try c.decodeIfPresent([UnityProject].self, forKey: .unity) ?? []
     }
 
     public static func parse(_ data: Data) throws -> Inventory {
@@ -31,7 +54,8 @@ public struct Inventory: Codable, Equatable, Sendable {
         let names = Set(exclude.map { $0.lowercased() })
         return Inventory(
             apps: apps.filter { !names.contains($0.name.lowercased()) },
-            tools: tools.filter { !names.contains($0.name.lowercased()) }
+            tools: tools.filter { !names.contains($0.name.lowercased()) },
+            unity: unity.filter { !names.contains($0.name.lowercased()) }
         )
     }
 }

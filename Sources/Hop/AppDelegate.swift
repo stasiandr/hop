@@ -37,7 +37,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let config = store.config
         let apps = resolveItems(config)
         let inventory = inventoryStore.inventory.excluding(config.exclude)
-        panel.apply(config: config, items: apps + inventoryApps(inventory, skipping: apps) + projects(inventory, config) + builtins())
+        panel.apply(config: config, items: apps + inventoryApps(inventory, skipping: apps) + projects(inventory, config) + unityProjects(inventory, config) + builtins())
         panel.error = store.error ?? inventoryStore.error
 
         if let problem = LoginAgentFile.sync(enabled: config.launchAtLogin) {
@@ -104,6 +104,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 terms: [tool.name],
                 icon: NSWorkspace.shared.icon(forFile: url.path),
                 run: { Self.open(folder: url, with: config.projectOpen ?? config.projectAltOpen) },
+                altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
+            )
+        }
+    }
+
+    /// Return opens the project in Unity; ⌘Return uses `project.alt_open` like other projects.
+    private func unityProjects(_ inventory: Inventory, _ config: Config) -> [Item] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        let hub = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.unity3d.unityhub")
+        return inventory.unity.compactMap { project in
+            let url = URL(fileURLWithPath: project.path, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            let shown = url.path.hasPrefix(home + "/") ? "~" + url.path.dropFirst(home.count) : url.path
+            return Item(
+                title: project.name,
+                subtitle: [project.version.map { "Unity \($0)" }, shown].compactMap { $0 }.joined(separator: " · "),
+                terms: [project.name, "unity \(project.name)"],
+                icon: NSWorkspace.shared.icon(forFile: hub?.path ?? url.path),
+                run: { UnityLauncher.open(project: url.path) },
                 altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
             )
         }
