@@ -107,6 +107,11 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         positionOnActiveScreen()
         makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
+        // Queries are app names: only Latin layouts, so a Russian (or any
+        // non-Roman) layout left active elsewhere doesn't produce "ыфа".
+        // The previous layout comes back once the panel loses focus.
+        (fieldEditor(true, for: field) as? NSTextView)?.inputContext?.allowedInputSourceLocales =
+            [NSAllRomanInputSourcesLocaleIdentifier]
         makeFirstResponder(field)
     }
 
@@ -164,8 +169,10 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         let row = table.selectedRow
         guard results.indices.contains(row) else { return }
         let item = results[row]
-        dismiss()
+        // Run while hop is still active: macOS only lets the active app hand
+        // over focus, so hiding first would leave running apps in the background.
         item.run()
+        orderOut(nil)
     }
 
     @objc private func clickedRow() {

@@ -65,14 +65,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 subtitle: url.path,
                 terms: [entry.name] + entry.aliases,
                 icon: NSWorkspace.shared.icon(forFile: url.path),
-                run: {
-                    let cfg = NSWorkspace.OpenConfiguration()
-                    cfg.activates = true
-                    NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, error in
-                        if let error { NSLog("hop: failed to open \(url.path): \(error)") }
-                    }
-                }
+                run: { Self.open(app: url) }
             )
+        }
+    }
+
+    /// Launches the app, or brings it to the front (reopening a window if it
+    /// has none) when it's already running.
+    private static func open(app url: URL) {
+        if #available(macOS 14.0, *), let id = Bundle(url: url)?.bundleIdentifier {
+            NSApp.yieldActivation(toApplicationWithBundleIdentifier: id)
+        }
+        let cfg = NSWorkspace.OpenConfiguration()
+        cfg.activates = true
+        NSWorkspace.shared.openApplication(at: url, configuration: cfg) { _, error in
+            guard let error else { return }
+            NSLog("hop: failed to open \(url.path): \(error)")
+            DispatchQueue.main.async { NSApp.hide(nil) } // don't keep focus with no window
         }
     }
 
