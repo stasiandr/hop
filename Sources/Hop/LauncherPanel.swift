@@ -9,6 +9,8 @@ struct Item {
     /// Built-in commands stay out of the default (empty query) list.
     var hiddenWhenEmpty = false
     var run: () -> Void
+    /// ⌘Return; falls back to `run`.
+    var altRun: (() -> Void)? = nil
 }
 
 /// The floating search panel: a text field on top, results below.
@@ -165,13 +167,13 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         layoutForResults()
     }
 
-    private func runSelected() {
+    private func runSelected(alt: Bool = false) {
         let row = table.selectedRow
         guard results.indices.contains(row) else { return }
         let item = results[row]
         // Run while hop is still active: macOS only lets the active app hand
         // over focus, so hiding first would leave running apps in the background.
-        item.run()
+        (alt ? item.altRun ?? item.run : item.run)()
         orderOut(nil)
     }
 
@@ -204,9 +206,14 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         return true
     }
 
-    // Cmd+1…9 runs the nth result.
+    // Cmd+Return runs the alternative action; Cmd+1…9 runs the nth result.
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
-        if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+        let mods = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if mods == .command, event.keyCode == 36 || event.keyCode == 76 { // Return, keypad Enter
+            runSelected(alt: true)
+            return true
+        }
+        if mods == .command,
            let n = event.charactersIgnoringModifiers.flatMap(Int.init), (1...9).contains(n), n <= results.count {
             table.selectRowIndexes([n - 1], byExtendingSelection: false)
             runSelected()

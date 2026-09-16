@@ -129,3 +129,34 @@ import Testing
         #expect(throws: ConfigError.self) { try Config.parse("launch_at_login = 1") }
     }
 }
+
+@Suite struct InventoryTests {
+    @Test func parsesMacAndConfInventory() throws {
+        let json = """
+        {"apps": [{"name": "arc", "path": "/Applications/Arc.app"},
+                  {"name": "unity-hub", "path": "/Applications/Unity Hub.app"}],
+         "tools": [{"name": "hop", "path": "/Users/me/personal/hop", "repo": "git@github.com:me/hop.git"}]}
+        """
+        let inventory = try Inventory.parse(Data(json.utf8)).excluding(["Unity-Hub"])
+        #expect(inventory.apps.map(\.title) == ["Arc"])
+        #expect(inventory.tools == [Inventory.Tool(name: "hop", path: "/Users/me/personal/hop")])
+    }
+
+    @Test func configKeys() throws {
+        let config = try Config.parse("""
+        inventory = "~/.local/state/mac-and-conf/inventory.json"
+        exclude = ["steam"]
+
+        [project]
+        open = "dev.zed.Zed"
+        alt_open = "com.mitchellh.ghostty"
+        """)
+        #expect(config.inventory == "~/.local/state/mac-and-conf/inventory.json")
+        #expect(config.exclude == ["steam"])
+        #expect(config.projectOpen == "dev.zed.Zed")
+        #expect(config.projectAltOpen == "com.mitchellh.ghostty")
+        #expect(throws: ConfigError.self) { try Config.parse("exclude = [1]") }
+        #expect(throws: ConfigError.self) { try Config.parse("[project]\nopen_with = \"x\"") }
+        #expect(throws: ConfigError.self) { try Config.parse("hot_key = \"alt+space\"") }
+    }
+}

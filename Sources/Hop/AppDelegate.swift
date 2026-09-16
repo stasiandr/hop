@@ -3,12 +3,14 @@ import HopCore
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = ConfigStore()
+    private let inventoryStore = InventoryStore()
     private let hotKey = GlobalHotKey()
     private var panel: LauncherPanel!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         panel = LauncherPanel()
         hotKey.onPress = { [weak self] in self?.toggle() }
+        _ = inventoryStore.reloadIfChanged(path: store.config.inventory)
         applyConfig()
 
         // Launching hop again (e.g. from Finder) opens the panel.
@@ -25,14 +27,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func show() {
-        if store.reloadIfChanged() { applyConfig() }
+        let configChanged = store.reloadIfChanged()
+        let inventoryChanged = inventoryStore.reloadIfChanged(path: store.config.inventory)
+        if configChanged || inventoryChanged { applyConfig() }
         panel.present()
     }
 
     private func applyConfig() {
         let config = store.config
-        panel.apply(config: config, items: resolveItems(config) + builtins())
-        panel.error = store.error
+        let apps = resolveItems(config)
+        let inventory = inventoryStore.inventory.excluding(config.exclude)
+        panel.apply(config: config, items: apps + inventoryApps(inventory, skipping: apps) + projects(inventory, config) + builtins())
+        panel.error = store.error ?? inventoryStore.error
 
         if let problem = LoginAgentFile.sync(enabled: config.launchAtLogin) {
             panel.error = problem
@@ -62,11 +68,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             }
             return Item(
                 title: entry.name,
-                subtitle: url.path,
+                subtitle: url.standardizedFileURL.path,
                 terms: [entry.name] + entry.aliases,
                 icon: NSWorkspace.shared.icon(forFile: url.path),
                 run: { Self.open(app: url) }
             )
+        }
+    }
+
+    /// Inventory apps not already listed as [[app]] (which may add aliases).
+    private func inventoryApps(_ inventory: Inventory, skipping manual: [Item]) -> [Item] {
+        let known = Set(manual.compactMap(\.subtitle))
+        return inventory.apps.compactMap { app in
+            let url = URL(fileURLWithPath: app.path).standardizedFileURL
+            guard !known.contains(url.path), FileManager.default.fileExists(atPath: url.path) else { return nil }
+            return Item(
+                title: app.title,
+                subtitle: url.path,
+                terms: [app.title, app.name],
+                icon: NSWorkspace.shared.icon(forFile: url.path),
+                run: { Self.open(app: url) }
+            )
+        }
+    }
+
+    private func projects(_ inventory: Inventory, _ config: Config) -> [Item] {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+        return inventory.tools.compactMap { tool in
+            let url = URL(fileURLWithPath: tool.path, isDirectory: true)
+            guard FileManager.default.fileExists(atPath: url.path) else { return nil }
+            let shown = url.path.hasPrefix(home + "/") ? "~" + url.path.dropFirst(home.count) : url.path
+            return Item(
+                title: tool.name,
+                subtitle: shown,
+                terms: [tool.name],
+                icon: NSWorkspace.shared.icon(forFile: url.path),
+                run: { Self.open(folder: url, with: config.projectOpen ?? config.projectAltOpen) },
+                altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
+            )
+        }
+    }
+
+    /// Opens a folder in the app with this bundle id, or in Finder.
+    private static func open(folder: URL, with bundleID: String?) {
+        guard let bundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
+            if let bundleID { NSLog("hop: no app with bundle id \(bundleID)") }
+            NSWorkspace.shared.open(folder)
+            return
+        }
+        if #available(macOS 14.0, *) {
+            NSApp.yieldActivation(toApplicationWithBundleIdentifier: bundleID)
+        }
+        let cfg = NSWorkspace.OpenConfiguration()
+        cfg.activates = true
+        NSWorkspace.shared.open([folder], withApplicationAt: app, configuration: cfg) { _, error in
+            guard let error else { return }
+            NSLog("hop: failed to open \(folder.path) with \(bundleID): \(error)")
+            DispatchQueue.main.async { NSApp.hide(nil) }
         }
     }
 

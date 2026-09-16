@@ -23,6 +23,13 @@ public struct Config: Equatable, Sendable {
     public var maxResults: Int = 8
     public var launchAtLogin = false
     public var apps: [AppEntry] = []
+    /// Path to an inventory file (see `Inventory`); `~` is allowed.
+    public var inventory: String?
+    /// Inventory names to leave out.
+    public var exclude: [String] = []
+    /// Bundle ids of the apps that open a project on Return / ⌘Return.
+    public var projectOpen: String?
+    public var projectAltOpen: String?
 
     public init() {}
 
@@ -48,6 +55,31 @@ public struct Config: Equatable, Sendable {
             config.launchAtLogin = b
         }
 
+        if let v = root["inventory"] {
+            guard let s = v.string, !s.isEmpty else { throw ConfigError("inventory must be a path") }
+            config.inventory = s
+        }
+        if let v = root["exclude"] {
+            guard let items = v.array, case let names = items.compactMap(\.string), names.count == items.count else {
+                throw ConfigError("exclude must be an array of strings")
+            }
+            config.exclude = names
+        }
+        if let v = root["project"] {
+            guard let t = v.table else { throw ConfigError("use [project] for project settings") }
+            for (key, value) in t {
+                guard let s = value.string, !s.isEmpty else { throw ConfigError("project.\(key) must be a bundle id") }
+                switch key {
+                case "open": config.projectOpen = s
+                case "alt_open": config.projectAltOpen = s
+                default: throw ConfigError("project: unknown key '\(key)'")
+                }
+            }
+        }
+        for key in root.keys where !knownKeys.contains(key) {
+            throw ConfigError("unknown key '\(key)'")
+        }
+
         if let v = root["app"] {
             guard let items = v.array else { throw ConfigError("use [[app]] to declare apps") }
             config.apps = try items.enumerated().map { index, item in
@@ -56,6 +88,10 @@ public struct Config: Equatable, Sendable {
         }
         return config
     }
+
+    private static let knownKeys: Set<String> = [
+        "hotkey", "width", "max_results", "launch_at_login", "inventory", "exclude", "project", "app",
+    ]
 
     private static func parseApp(_ t: [String: TOMLValue], index: Int) throws -> AppEntry {
         let label = "app #\(index + 1)"
@@ -102,6 +138,11 @@ public struct Config: Equatable, Sendable {
     # Start hop when you log in (a LaunchAgent in ~/Library/LaunchAgents).
     launch_at_login = false
 
+    # Apps and projects from an inventory file, e.g. the one mac-and-conf writes
+    # (apps from casks, projects from [tools]). Names in `exclude` are skipped.
+    # inventory = "~/.local/state/mac-and-conf/inventory.json"
+    # exclude = ["unity-hub"]
+
     # Each [[app]] is something hop can launch.
     #   path   — path to the .app bundle (~ allowed), or
     #   bundle — bundle identifier (e.g. "com.apple.Safari")
@@ -119,6 +160,12 @@ public struct Config: Equatable, Sendable {
     [[app]]
     path = "/System/Applications/System Settings.app"
     alias = ["prefs", "settings"]
+
+    # How projects open: Return uses `open`, ⌘Return uses `alt_open` (bundle ids).
+    # Without them, projects open in Finder.
+    # [project]
+    # open = "dev.zed.Zed"
+    # alt_open = "com.mitchellh.ghostty"
 
     """
 }

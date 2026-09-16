@@ -29,6 +29,7 @@ Shortcuts → Spotlight (or with [mac-and-conf](#with-mac-and-conf)), then set
 | --- | --- |
 | `↑` `↓` / `Tab` `⇧Tab` / `⌃P` `⌃N` | Move selection |
 | `Return` | Launch selected |
+| `⌘Return` | Alternative action (projects: `project.alt_open`) |
 | `⌘1`…`⌘9` | Launch nth result |
 | `Esc` | Clear query, then close |
 
@@ -60,6 +61,23 @@ alias = "vs"
 Each `[[app]]` needs exactly one of `path` or `bundle`. `name` defaults to the
 bundle's file name; `alias` is a string or a list of strings.
 
+### Inventory: apps and projects from elsewhere
+
+```toml
+inventory = "~/.local/state/mac-and-conf/inventory.json"
+exclude = ["unity-hub"]              # inventory names to skip
+
+[project]
+open = "dev.zed.Zed"                 # Return
+alt_open = "com.mitchellh.ghostty"   # ⌘Return
+```
+
+The inventory is JSON with `apps` (`name`, `path` to a .app) and `tools`
+(`name`, `path` to a folder, shown as projects). hop reloads it when it
+changes. An `[[app]]` for the same bundle wins, so it can add aliases. Without
+`[project]` settings projects open in Finder; with only one of them set, both
+keys use it.
+
 The config file may be a symlink (e.g. into a dotfiles repo); edits to the
 target are picked up too.
 
@@ -78,6 +96,9 @@ links = { "~/Applications/hop.app" = "build/hop.app" }
 [symbolic_hotkeys]
 spotlight = false   # free ⌘ Space for hop
 ```
+
+`mac-and-conf apply` writes the inventory with apps from your casks and
+projects from `[tools]`; point `inventory` at it (see above).
 
 ## Development
 
