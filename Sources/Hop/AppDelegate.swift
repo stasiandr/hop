@@ -70,7 +70,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: entry.name,
                 subtitle: url.standardizedFileURL.path,
                 terms: [entry.name] + entry.aliases,
-                icon: NSWorkspace.shared.icon(forFile: url.path),
+                icon: Self.icon(atPath: url.path),
                 run: { Self.open(app: url) }
             )
         }
@@ -86,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: app.title,
                 subtitle: url.path,
                 terms: [app.title, app.name],
-                icon: NSWorkspace.shared.icon(forFile: url.path),
+                icon: Self.icon(atPath: url.path),
                 run: { Self.open(app: url) }
             )
         }
@@ -102,7 +102,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: tool.name,
                 subtitle: shown,
                 terms: [tool.name],
-                icon: NSWorkspace.shared.icon(forFile: url.path),
+                icon: Self.icon(atPath: url.path),
                 run: { Self.open(folder: url, with: config.projectOpen ?? config.projectAltOpen) },
                 altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
             )
@@ -121,11 +121,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 title: project.name,
                 subtitle: [project.version.map { "Unity \($0)" }, shown].compactMap { $0 }.joined(separator: " · "),
                 terms: [project.name, "unity \(project.name)"],
-                icon: NSWorkspace.shared.icon(forFile: hub?.path ?? url.path),
+                icon: Self.icon(atPath: hub?.path ?? url.path),
                 run: { UnityLauncher.open(project: url.path) },
                 altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
             )
         }
+    }
+
+    /// Icon of what the path points to: a symlink (e.g. ~/Applications/Pilot.app
+    /// made by mac-and-conf) would otherwise get Finder's alias arrow.
+    private static func icon(atPath path: String) -> NSImage {
+        NSWorkspace.shared.icon(forFile: URL(fileURLWithPath: path).resolvingSymlinksInPath().path)
     }
 
     /// Opens a folder in the app with this bundle id, or in Finder.
