@@ -27,13 +27,62 @@ Shortcuts → Spotlight (or with [mac-and-conf](#with-mac-and-conf)), then set
 
 | Key | Action |
 | --- | --- |
-| `↑` `↓` / `Tab` `⇧Tab` / `⌃P` `⌃N` | Move selection |
+| `↑` `↓` / `Tab` `⇧Tab` / `⌃P` `⌃N` | Move selection (Tab completes paths) |
 | `Return` | Launch selected |
 | `⌘Return` | Alternative action (projects: `project.alt_open`) |
 | `⌘1`…`⌘9` | Launch nth result |
 | `Esc` | Clear query, then close |
 
 Type `edit config` or `quit hop` for built-in commands.
+
+## Files and folders
+
+Type a path starting with `~` or `/` to open it: `~/notes/index.json`. Results
+complete the last component as you type (`~/personal/ho` → `~/personal/hop/`,
+`~/personal/` lists the folder; hidden entries show once you type the dot).
+Tab puts the selected path in the field, so `~/pe` Tab `ho` Tab gets you to
+`~/personal/hop/`; Tab on a folder that's already typed steps into its first
+entry.
+Return opens the file or folder with `project.open` (say, your editor),
+⌘Return opens a folder — or a file's folder — with `project.alt_open` (say, a
+terminal). Without `[project]` settings they open in their default app.
+
+## Calculator
+
+Type a calculation and the answer shows up on top of the results. Return copies
+the number, ⌘Return copies it with units.
+
+| Query | Result |
+| --- | --- |
+| `2^10 + sqrt(16)` | `1028` |
+| `200 + 15%`, `15% of 80` | `230`, `12` |
+| `90 min to h` | `1.5 h` |
+| `5400 s` | `1.5 h`, `1 h 30 min` |
+| `1h 30min in min` | `90 min` |
+| `1.5 GB in MiB` | `1430.511475 MiB` |
+| `100 Mbit to MB` | `12.5 MB` |
+| `1 GB / 10 MB/s` | `100 s` |
+| `100 km / 2 h` | `50 km/h` |
+| `100 F to C` | `37.77777778 °C` |
+| `255 to hex`, `0xff` | `0xff`, `255` |
+| `100 usd to rub`, `$20 + 15%` | `8123.45 RUB`, `23 USD` |
+| `100 eur` | the same in `currencies` from the config |
+
+Conversions use `to`, `in`, `as` or `->`. Units: length, mass, time, volume,
+temperature, angles, speed, frequency and data. Data follows SI/IEC: `KB`,
+`MB`, `GB` are powers of 1000, `KiB`, `MiB`, `GiB` powers of 1024; bits are
+spelled out (`Mbit`, `Mbps`). Unit names ignore case. Functions: `sqrt`,
+`cbrt`, `abs`, `round`, `floor`, `ceil`, `sin`/`cos`/`tan` (radians or `deg`),
+`asin`/`acos`/`atan`, `ln`, `log` (base 10), `lg` (base 2), `exp`; constants
+`pi`, `e`, `tau`; `mod` for remainder.
+
+Currencies go by ISO code (`usd`, `rub`, `gel`), symbol (`$`, `€`, `₽`, `₾`) or
+name (`dollars`, `euros`, `rubles`), plus `btc` and `eth`. An amount without a
+target is shown in `currencies = ["USD", "EUR"]` from the config, which
+defaults to your region's currency, USD and EUR. Rates come from
+[exchange-api](https://github.com/fawazahmed0/exchange-api): hop fetches them
+when the panel opens and the cached copy is over 12 hours old, and keeps them
+in `~/Library/Caches/hop/usd.json` for offline use.
 
 ## Configuration
 
@@ -79,7 +128,8 @@ the front if the project is already open, otherwise runs `unity open`; if that
 fails (say, the editor version isn't installed) the project goes to
 [uhub](https://github.com/stasiandr/uhub), which offers to install it. ⌘Return
 uses `project.alt_open` like any other project. hop reloads it when it
-changes. An `[[app]]` for the same bundle wins, so it can add aliases. Without
+changes. Projects that are git working trees show their current branch
+(read when the panel opens). An `[[app]]` for the same bundle wins, so it can add aliases. Without
 `[project]` settings projects open in Finder; with only one of them set, both
 keys use it.
 

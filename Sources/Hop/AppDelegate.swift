@@ -4,6 +4,7 @@ import HopCore
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = ConfigStore()
     private let inventoryStore = InventoryStore()
+    private let currencyStore = CurrencyStore()
     private let hotKey = GlobalHotKey()
     private var panel: LauncherPanel!
 
@@ -31,14 +32,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let inventoryChanged = inventoryStore.reloadIfChanged(path: store.config.inventory)
         if configChanged || inventoryChanged { applyConfig() }
         panel.present()
+        currencyStore.refreshIfStale { [weak self] in self?.applyCurrencies() }
     }
 
     private func applyConfig() {
         let config = store.config
         let apps = resolveItems(config)
         let inventory = inventoryStore.inventory.excluding(config.exclude)
+        panel.pathItems = { [maxResults = config.maxResults] query in Self.pathItems(query, config, limit: maxResults) }
         panel.apply(config: config, items: apps + inventoryApps(inventory, skipping: apps) + projects(inventory, config) + unityProjects(inventory, config) + builtins())
         panel.error = store.error ?? inventoryStore.error
+        applyCurrencies()
 
         if let problem = LoginAgentFile.sync(enabled: config.launchAtLogin) {
             panel.error = problem
@@ -52,6 +56,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         } catch {
             panel.error = "\(error)"
         }
+    }
+
+    private func applyCurrencies() {
+        var currencies = currencyStore.currencies
+        let regional = Locale.current.currency?.identifier
+        let defaults = [regional, "USD", "EUR"].compactMap { $0 }
+        currencies.targets = (store.config.currencies ?? defaults).reduce(into: []) { if !$0.contains($1) { $0.append($1) } }
+        panel.currencies = currencies
     }
 
     private func resolveItems(_ config: Config) -> [Item] {
@@ -101,10 +113,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return Item(
                 title: tool.name,
                 subtitle: shown,
+                repo: url,
                 terms: [tool.name],
                 icon: Self.icon(atPath: url.path),
-                run: { Self.open(folder: url, with: config.projectOpen ?? config.projectAltOpen) },
-                altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
+                run: { Self.open(url, with: config.projectOpen ?? config.projectAltOpen) },
+                altRun: { Self.open(url, with: config.projectAltOpen ?? config.projectOpen) }
             )
         }
     }
@@ -119,13 +132,46 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let shown = url.path.hasPrefix(home + "/") ? "~" + url.path.dropFirst(home.count) : url.path
             return Item(
                 title: project.name,
-                subtitle: [project.version.map { "Unity \($0)" }, shown].compactMap { $0 }.joined(separator: " · "),
+                subtitle: shown,
+                repo: url,
                 terms: [project.name, "unity \(project.name)"],
                 icon: Self.icon(atPath: hub?.path ?? url.path),
                 run: { UnityLauncher.open(project: url.path) },
-                altRun: { Self.open(folder: url, with: config.projectAltOpen ?? config.projectOpen) }
+                altRun: { Self.open(url, with: config.projectAltOpen ?? config.projectOpen) }
             )
         }
+    }
+
+    /// `~/notes/index.json`: Return opens it with `project.open` (e.g. Pilot),
+    /// ⌘Return opens it — or, for a file, its folder — with `project.alt_open`.
+    private static func pathItems(_ query: String, _ config: Config, limit: Int) -> [Item] {
+        let home = NSHomeDirectory()
+        let open = config.projectOpen ?? config.projectAltOpen
+        let altOpen = config.projectAltOpen ?? config.projectOpen
+        let hint = [appName(open).map { "Return: \($0)" }, appName(altOpen).map { "⌘Return: \($0)" }]
+            .compactMap { $0 }.joined(separator: " · ")
+        return PathQuery.matches(query, home: home, limit: limit).map { match in
+            let url = URL(fileURLWithPath: match.path, isDirectory: match.isDirectory)
+            // Keep the spelling that was typed: `/Users/me/x` stays unabbreviated.
+            let shown = query.hasPrefix("~") ? PathQuery.abbreviate(match.path, home: home) : match.path
+            let name = url.lastPathComponent + (match.isDirectory && match.path != "/" ? "/" : "")
+            return Item(
+                title: name,
+                subtitle: [PathQuery.abbreviate(match.path, home: home), hint.isEmpty ? nil : hint]
+                    .compactMap { $0 }.joined(separator: " · "),
+                repo: match.isDirectory ? url : nil,
+                terms: [],
+                icon: icon(atPath: match.path),
+                run: { Self.open(url, with: open) },
+                altRun: { Self.open(match.isDirectory ? url : url.deletingLastPathComponent(), with: altOpen) },
+                completion: shown + (match.isDirectory && match.path != "/" ? "/" : "")
+            )
+        }
+    }
+
+    private static func appName(_ bundleID: String?) -> String? {
+        guard let bundleID, let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else { return nil }
+        return FileManager.default.displayName(atPath: url.path).replacingOccurrences(of: ".app", with: "")
     }
 
     /// Icon of what the path points to: a symlink (e.g. ~/Applications/Pilot.app
@@ -134,11 +180,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSWorkspace.shared.icon(forFile: URL(fileURLWithPath: path).resolvingSymlinksInPath().path)
     }
 
-    /// Opens a folder in the app with this bundle id, or in Finder.
-    private static func open(folder: URL, with bundleID: String?) {
+    /// Opens a folder or file in the app with this bundle id, or in its default app.
+    private static func open(_ target: URL, with bundleID: String?) {
         guard let bundleID, let app = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleID) else {
             if let bundleID { NSLog("hop: no app with bundle id \(bundleID)") }
-            NSWorkspace.shared.open(folder)
+            NSWorkspace.shared.open(target)
             return
         }
         if #available(macOS 14.0, *) {
@@ -146,9 +192,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let cfg = NSWorkspace.OpenConfiguration()
         cfg.activates = true
-        NSWorkspace.shared.open([folder], withApplicationAt: app, configuration: cfg) { _, error in
+        NSWorkspace.shared.open([target], withApplicationAt: app, configuration: cfg) { _, error in
             guard let error else { return }
-            NSLog("hop: failed to open \(folder.path) with \(bundleID): \(error)")
+            NSLog("hop: failed to open \(target.path) with \(bundleID): \(error)")
             DispatchQueue.main.async { NSApp.hide(nil) }
         }
     }

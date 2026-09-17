@@ -30,6 +30,9 @@ public struct Config: Equatable, Sendable {
     /// Bundle ids of the apps that open a project on Return / ⌘Return.
     public var projectOpen: String?
     public var projectAltOpen: String?
+    /// Currency codes an amount is converted into when no "to …" is given.
+    /// nil: the system's currency, USD and EUR.
+    public var currencies: [String]?
 
     public init() {}
 
@@ -65,6 +68,12 @@ public struct Config: Equatable, Sendable {
             }
             config.exclude = names
         }
+        if let v = root["currencies"] {
+            guard let items = v.array, case let codes = items.compactMap(\.string), codes.count == items.count else {
+                throw ConfigError("currencies must be an array of currency codes")
+            }
+            config.currencies = codes.map { $0.uppercased() }
+        }
         if let v = root["project"] {
             guard let t = v.table else { throw ConfigError("use [project] for project settings") }
             for (key, value) in t {
@@ -90,7 +99,7 @@ public struct Config: Equatable, Sendable {
     }
 
     private static let knownKeys: Set<String> = [
-        "hotkey", "width", "max_results", "launch_at_login", "inventory", "exclude", "project", "app",
+        "hotkey", "width", "max_results", "launch_at_login", "inventory", "exclude", "currencies", "project", "app",
     ]
 
     private static func parseApp(_ t: [String: TOMLValue], index: Int) throws -> AppEntry {
@@ -142,6 +151,10 @@ public struct Config: Equatable, Sendable {
     # (apps from casks, projects from [tools]). Names in `exclude` are skipped.
     # inventory = "~/.local/state/mac-and-conf/inventory.json"
     # exclude = ["unity-hub"]
+
+    # Type "100 usd" to see it in these currencies (defaults to your region's
+    # currency, USD and EUR). Rates are fetched once a day.
+    # currencies = ["USD", "EUR"]
 
     # Each [[app]] is something hop can launch.
     #   path   — path to the .app bundle (~ allowed), or

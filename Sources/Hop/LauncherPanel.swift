@@ -4,6 +4,9 @@ import HopCore
 struct Item {
     var title: String
     var subtitle: String?
+    /// Git working tree whose current branch is prepended to the subtitle
+    /// when the row is shown, so it's never stale.
+    var repo: URL? = nil
     var terms: [String]
     var icon: NSImage?
     /// Built-in commands stay out of the default (empty query) list.
@@ -11,6 +14,8 @@ struct Item {
     var run: () -> Void
     /// ⌘Return; falls back to `run`.
     var altRun: (() -> Void)? = nil
+    /// Query text Tab puts in the field (paths).
+    var completion: String? = nil
 }
 
 /// The floating search panel: a text field on top, results below.
@@ -29,6 +34,11 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
     private var results: [Item] = []
     private var width: CGFloat = 640
     private var maxResults = 8
+    /// Rows for a query that is a file system path (see `PathQuery`).
+    var pathItems: (String) -> [Item] = { _ in [] }
+    var currencies = Currencies() {
+        didSet { if isVisible { refresh() } }
+    }
 
     var error: String? {
         didSet {
@@ -135,10 +145,35 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
     private func refresh() {
         let query = field.stringValue
         let pool = query.isEmpty ? allItems.filter { !$0.hiddenWhenEmpty } : allItems
-        results = Array(Matcher.rank(pool, query: query, terms: \.terms).prefix(maxResults))
+        let answers = Calculator.evaluate(query, currencies: currencies).map(Self.calculatorItem)
+        let paths = pathItems(query)
+        let matches = PathQuery.expand(query, home: NSHomeDirectory()) == nil ? Matcher.rank(pool, query: query, terms: \.terms) : []
+        results = Array((answers + paths + matches).prefix(maxResults))
         table.reloadData()
         if !results.isEmpty { table.selectRowIndexes([0], byExtendingSelection: false) }
         layoutForResults()
+    }
+
+    private static let calculatorIcon = NSImage(systemSymbolName: "equal.circle", accessibilityDescription: nil)
+
+    /// Return copies the number, ⌘Return copies it with units.
+    private static func calculatorItem(_ answer: Calculator.Result) -> Item {
+        let withUnits = answer.text.replacingOccurrences(of: "\u{202F}", with: "")
+        let hint = withUnits == answer.value ? "Copy" : "Copy \(answer.value) · ⌘Return copies \(withUnits)"
+        return Item(
+            title: answer.text,
+            subtitle: [hint, answer.note].compactMap { $0 }.joined(separator: " · "),
+            terms: [],
+            icon: calculatorIcon,
+            run: { copy(answer.value) },
+            altRun: { copy(withUnits) }
+        )
+    }
+
+    private static func copy(_ text: String) {
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+        NSApp.hide(nil) // hand focus back to the previous app
     }
 
     private func layoutForResults() {
@@ -186,6 +221,22 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         runSelected()
     }
 
+    /// Tab on a path fills the field with the selected row. When that's what's
+    /// already typed (`~/proj/` with `~/proj` selected), takes the next row.
+    private func completeSelected() -> Bool {
+        let rows = results.indices.filter { results[$0].completion != nil }
+        guard let current = rows.firstIndex(of: table.selectedRow) else { return false }
+        var text = results[rows[current]].completion!
+        if text == field.stringValue {
+            guard current + 1 < rows.count else { return false }
+            text = results[rows[current + 1]].completion!
+        }
+        field.stringValue = text
+        field.currentEditor()?.selectedRange = NSRange(location: (text as NSString).length, length: 0)
+        refresh()
+        return true
+    }
+
     private func moveSelection(_ delta: Int) {
         guard !results.isEmpty else { return }
         let row = (table.selectedRow + delta + results.count) % results.count
@@ -199,7 +250,8 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
 
     func control(_ control: NSControl, textView: NSTextView, doCommandBy selector: Selector) -> Bool {
         switch selector {
-        case #selector(NSResponder.moveDown(_:)), #selector(NSResponder.insertTab(_:)): moveSelection(1)
+        case #selector(NSResponder.insertTab(_:)): if !completeSelected() { moveSelection(1) }
+        case #selector(NSResponder.moveDown(_:)): moveSelection(1)
         case #selector(NSResponder.moveUp(_:)), #selector(NSResponder.insertBacktab(_:)): moveSelection(-1)
         case #selector(NSResponder.insertNewline(_:)): runSelected()
         case #selector(NSResponder.cancelOperation(_:)):
@@ -283,8 +335,10 @@ private final class ResultCell: NSTableCellView {
     func configure(_ item: Item, index: Int) {
         icon.image = item.icon
         title.stringValue = item.title
-        subtitle.stringValue = item.subtitle ?? ""
-        subtitle.isHidden = item.subtitle == nil
+        let branch = item.repo.flatMap(GitBranch.current(in:))
+        let text = [branch, item.subtitle].compactMap { $0 }
+        subtitle.stringValue = text.joined(separator: " · ")
+        subtitle.isHidden = text.isEmpty
         shortcut.stringValue = index < 9 ? "⌘\(index + 1)" : ""
     }
 }
