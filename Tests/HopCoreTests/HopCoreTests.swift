@@ -356,3 +356,27 @@ import Testing
         #expect(Calculator.evaluate("2 + 2", currencies: currencies).first?.note == nil)
     }
 }
+
+@Suite struct SystemLoadTests {
+    @Test func summarizes() {
+        let load = SystemLoad(cpu: 0.123, gpu: 0.03, memoryUsed: 19_756_849_152, memoryTotal: 51_539_607_552,
+                              download: 1_234_567, upload: 40_200)
+        #expect(load.summary == "CPU 12% · GPU 3% · RAM 18.4/48 GB · ↓ 1.2 MB/s ↑ 40 KB/s")
+    }
+
+    @Test func showsUnknownPartsAsEllipsis() {
+        #expect(SystemLoad().summary == "CPU … · GPU … · RAM … · ↓ … ↑ …")
+        #expect(SystemLoad(gpu: 0, memoryUsed: 1 << 30, memoryTotal: 16 << 30).summary
+            == "CPU … · GPU 0% · RAM 1/16 GB · ↓ … ↑ …")
+    }
+
+    @Test func formatsRates() {
+        #expect(SystemLoad.rate(0) == "0 B/s")
+        #expect(SystemLoad.rate(512) == "512 B/s")
+        #expect(SystemLoad.rate(999.7) == "1.0 KB/s")
+        #expect(SystemLoad.rate(9_940) == "9.9 KB/s")
+        #expect(SystemLoad.rate(40_200) == "40 KB/s")
+        #expect(SystemLoad.rate(3_500_000_000) == "3.5 GB/s")
+        #expect(SystemLoad.percent(1.7) == "100%")
+    }
+}

@@ -35,6 +35,10 @@ Shortcuts → Spotlight (or with [mac-and-conf](#with-mac-and-conf)), then set
 
 Type `edit config` or `quit hop` for built-in commands.
 
+Activity Monitor is always in the list; its subtitle shows the current load,
+updated every second while the panel is open:
+`CPU 12% · GPU 3% · RAM 18.4/48 GB · ↓ 1.2 MB/s ↑ 40 KB/s`.
+
 ## Files and folders
 
 Type a path starting with `~` or `/` to open it: `~/notes/index.json`. Results

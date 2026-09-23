@@ -7,6 +7,9 @@ struct Item {
     /// Git working tree whose current branch is prepended to the subtitle
     /// when the row is shown, so it's never stale.
     var repo: URL? = nil
+    /// Shown instead of `subtitle` and refreshed every second while the row is
+    /// on screen (Activity Monitor's system load).
+    var live: (() -> String)? = nil
     var terms: [String]
     var icon: NSImage?
     /// Built-in commands stay out of the default (empty query) list.
@@ -29,6 +32,7 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
     private let scroll = NSScrollView()
     private let errorLabel = NSTextField(labelWithString: "")
     private let latinInput = LatinInput()
+    private var liveTimer: Timer?
 
     private var allItems: [Item] = []
     private var results: [Item] = []
@@ -122,6 +126,7 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
         NSApp.activate(ignoringOtherApps: true)
         makeFirstResponder(field)
         latinInput.begin()
+        startLiveUpdates()
     }
 
     func dismiss() {
@@ -137,7 +142,22 @@ final class LauncherPanel: NSPanel, NSTextFieldDelegate, NSTableViewDataSource, 
     /// Every way out of the panel goes through here, so the layout is always restored.
     private func closePanel() {
         latinInput.end()
+        liveTimer?.invalidate()
+        liveTimer = nil
         orderOut(nil)
+    }
+
+    /// Redraws rows with a `live` subtitle in place, keeping the selection.
+    private func startLiveUpdates() {
+        liveTimer?.invalidate()
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            guard let self else { return }
+            for (row, item) in results.enumerated() where item.live != nil {
+                (table.view(atColumn: 0, row: row, makeIfNecessary: false) as? ResultCell)?.configure(item, index: row)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        liveTimer = timer
     }
 
     // MARK: - Search
@@ -336,7 +356,7 @@ private final class ResultCell: NSTableCellView {
         icon.image = item.icon
         title.stringValue = item.title
         let branch = item.repo.flatMap(GitBranch.current(in:))
-        let text = [branch, item.subtitle].compactMap { $0 }
+        let text = [branch, item.live?() ?? item.subtitle].compactMap { $0 }
         subtitle.stringValue = text.joined(separator: " · ")
         subtitle.isHidden = text.isEmpty
         shortcut.stringValue = index < 9 ? "⌘\(index + 1)" : ""

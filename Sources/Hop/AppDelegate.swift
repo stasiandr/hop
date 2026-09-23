@@ -6,6 +6,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let inventoryStore = InventoryStore()
     private let currencyStore = CurrencyStore()
     private let hotKey = GlobalHotKey()
+    private let systemMonitor = SystemMonitor()
     private var panel: LauncherPanel!
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -37,7 +38,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func applyConfig() {
         let config = store.config
-        let apps = resolveItems(config)
+        let apps = withActivityMonitor(resolveItems(config))
         let inventory = inventoryStore.inventory.excluding(config.exclude)
         panel.pathItems = { [maxResults = config.maxResults] query in Self.pathItems(query, config, limit: maxResults) }
         panel.apply(config: config, items: apps + inventoryApps(inventory, skipping: apps) + projects(inventory, config) + unityProjects(inventory, config) + builtins())
@@ -86,6 +87,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 run: { Self.open(app: url) }
             )
         }
+    }
+
+    /// Activity Monitor, with the current CPU, GPU, memory and network load as
+    /// its subtitle. An [[app]] entry for it (with aliases) gets the same subtitle.
+    private func withActivityMonitor(_ apps: [Item]) -> [Item] {
+        guard let url = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "com.apple.ActivityMonitor")?
+            .standardizedFileURL else { return apps }
+        let live = { [systemMonitor] in systemMonitor.current().summary }
+        if let index = apps.firstIndex(where: { $0.subtitle == url.path }) {
+            var apps = apps
+            apps[index].live = live
+            return apps
+        }
+        return apps + [Item(
+            title: "Activity Monitor",
+            subtitle: url.path,
+            live: live,
+            terms: ["Activity Monitor", "top", "cpu", "gpu", "memory", "ram", "network"],
+            icon: Self.icon(atPath: url.path),
+            run: { Self.open(app: url) }
+        )]
     }
 
     /// Inventory apps not already listed as [[app]] (which may add aliases).
